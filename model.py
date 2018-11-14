@@ -1,24 +1,17 @@
 from keras.models import Model
-from keras.layers import Input
-from keras.layers.core import Dropout, Lambda
-from keras.layers.convolutional import Conv2D, Conv2DTranspose
-from keras.layers.pooling import MaxPooling2D
+from keras.layers import Input, Dropout, Conv2D, Conv2DTranspose, UpSampling2D, MaxPooling2D
 from keras.layers.merge import concatenate
 # from keras.callbacks import EarlyStopping, ModelCheckpoint
 from keras import regularizers
-
 import cfg
 
-def GetUNetModel(reg):
-    # Build U-Net model
-    
-    r = regularizers.l2(reg)
-    
-    # (128, 128, 1)
-    inputs = Input((cfg.IMG_HEIGHT, cfg.IMG_WIDTH, cfg.IMG_CHANNELS))
-    s = Lambda(lambda x: x / 255) (inputs)
-    # (128, 128, 3) -> (128, 128, 16)
-    c1 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same', kernel_regularizer=r) (s)
+
+def GetUNet(reg, input_channel):    
+    r = regularizers.l2(reg)    
+    # (128, 128, input_channel)
+    inputs = Input((cfg.IMG_HEIGHT, cfg.IMG_WIDTH, input_channel))
+    # (128, 128, input_channel) -> (128, 128, 16)
+    c1 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same', kernel_regularizer=r) (inputs)
     c1 = Dropout(0.1) (c1)
     # (128, 128, 16) -> (128, 128, 16)
     c1 = Conv2D(16, (3, 3), activation='elu', kernel_initializer='he_normal', padding='same', kernel_regularizer=r) (c1)
@@ -92,8 +85,88 @@ def GetUNetModel(reg):
     
     model = Model(inputs=[inputs], outputs=[outputs])
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=[])
-    model.summary()
+    if not cfg.debug: model.summary()
     return model
     
     
+def GetAutoenocder_V1_Origin(reg):
+    input_img = Input(shape=(cfg.IMG_HEIGHT, cfg.IMG_WIDTH, cfg.IMG_CHANNELS), name='image_input')
+    
+    #enoder 
+    x = Conv2D(32, (3,3), activation='relu', padding='same')(input_img)
+    x = MaxPooling2D((2,2), padding='same', name='pool1')(x)
+    x = Conv2D(64, (3,3), activation='relu', padding='same')(x)
+    x = MaxPooling2D((2,2), padding='same', name='pool2')(x)
+    
+    #decoder
+    x = Conv2D(64, (3,3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2,2), name='upsample1')(x)
+    x = Conv2D(32, (3,3), activation='relu', padding='same')(x)
+    x = UpSampling2D((2,2), name='upsample2')(x)
+    x = Conv2D(1, (3,3), activation='sigmoid', padding='same')(x)
+    
+    #model
+    autoencoder = Model(inputs=input_img, outputs=x)
+    autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+    if not cfg.debug: autoencoder.summary()
+    return autoencoder
+  
+def GetAutoenocder_v2(reg):
+    # train_loss 0.1193 - val_loss: 0.1075
+    # # (32, 32, 1)
+    inputs = Input(shape=(cfg.IMG_HEIGHT, cfg.IMG_WIDTH, cfg.IMG_CHANNELS))
+    x = inputs
+    # (32, 32, 1) -> (16, 16, 32)
+    x = Conv2D(32, kernel_size=3, strides=2, activation='elu', padding='same')(x)
+    # (16, 16, 32) -> (8, 8, 64)
+    x = Conv2D(64, kernel_size=3, strides=2, activation='elu', padding='same')(x)
+    # (8, 8, 64) -> (4, 4, 128)
+    x = Conv2D(128, kernel_size=3, strides=2, activation='elu', padding='same')(x)
+    # (4, 4, 128) -> (4, 4, 16)
+    x = Conv2D(8, kernel_size=3, activation='elu', padding='same')(x)
+    
+    # (4, 4, 16) -> (4, 4, 128)
+    x = Conv2DTranspose(128, kernel_size=3, activation='relu', padding='same')(x)
+    # (4, 4, 128) -> (8, 8, 64)
+    x = Conv2DTranspose(64, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    # (8, 8, 64) -> (16, 16, 32)
+    x = Conv2DTranspose(32, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    # (16, 16, 32) -> (32, 32, 16)
+    x = Conv2DTranspose(16, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    # (32, 32, 16) -> (32, 32, 1)
+    x = Conv2DTranspose(1, kernel_size=3, activation='sigmoid', padding='same')(x)
+
+    
+    #model
+    autoencoder = Model(inputs=inputs, outputs=x)
+    autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+    if not cfg.debug: autoencoder.summary()
+    return autoencoder
+    
+def GetAutoenocder(reg):
+    inputs = Input(shape=(cfg.IMG_HEIGHT, cfg.IMG_WIDTH, cfg.IMG_CHANNELS))
+    x = inputs
+    # (32, 32, 1) -> (16, 16, 64)
+    x = Conv2D(64, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    # (16, 16, 64) -> (8, 8, 128)
+    x = Conv2D(128, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    # (8, 8, 128) -> (4, 4, 256)
+    x = Conv2D(256, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+
+    # (4, 4, 256) -> (8, 8, 128)
+    x = Conv2DTranspose(128, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    # (8, 8, 128) -> (16, 16, 64)
+    x = Conv2DTranspose(64, kernel_size=3, strides=2, activation='relu', padding='same')(x)
+    # (16, 16, 64) -> (32, 32, 1)
+    x = Conv2DTranspose(1, kernel_size=3, strides=2, activation='sigmoid', padding='same')(x)
+
+    #model
+    autoencoder = Model(inputs=inputs, outputs=x)
+    autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+    if not cfg.debug: autoencoder.summary()
+    return autoencoder
+    
+    
+if __name__=='__main__':
+    model = GetAutoenocder(cfg.reg)
     

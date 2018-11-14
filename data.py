@@ -16,11 +16,14 @@ class PathReader(object):
         return self.paths[idx]
         
 class DataGenerator(object):
-    def __init__(self, reader_x, reader_y, batch_size=16):
-        self.x = reader_x
+    def __init__(self, readers_x, reader_y, batch_size=cfg.batch_size):
+        self.xs = readers_x
         self.y = reader_y
-        assert self.x.len == self.y.len
-        self.len =self.x.len
+
+        self.len =self.y.len
+        for x in self.xs:
+            assert x.len == self.y.len
+        
         self.batch_size = batch_size
         
     @staticmethod
@@ -29,7 +32,6 @@ class DataGenerator(object):
 
     @staticmethod
     def PreprocessInput_X(image):
-        image = image[..., np.newaxis]
         image = image/255 - 0.5
         return image
         
@@ -41,10 +43,10 @@ class DataGenerator(object):
     
     @staticmethod
     def Crop(img_x, img_y, crop_size):
-        assert len(img_x.shape) == 2 #binary image
+        assert len(img_x.shape) == 3
         assert len(img_y.shape) == 2 #binary image
-        assert img_x.shape == img_y.shape # same size
-        h, w = img_x.shape
+        assert img_x.shape[:-1] == img_y.shape # same size
+        h, w = img_y.shape
         
         dy, dx = crop_size
         x = np.random.randint(0, w - dx + 1)
@@ -57,11 +59,15 @@ class DataGenerator(object):
             batch_y = []
             for _ in range(self.batch_size):
                 idx = np.random.randint(low=0, high=self.len)
-                path_x = self.x.Get(idx)
+                
+                path_xs = [x.Get(idx) for x in self.xs]
                 path_y = self.y.Get(idx)
                 
-                img_x = self.Read(path_x)
+                img_xs = [self.Read(path_x) for path_x in path_xs]
                 img_y = self.Read(path_y)
+                
+                # stack images from each reader together as 'channels'
+                img_x = np.stack(img_xs, axis=-1)
                 
                 img_x, img_y = self.Crop(img_x, img_y, crop_size=(cfg.IMG_HEIGHT, cfg.IMG_WIDTH))
                 batch_x.append(img_x)

@@ -18,8 +18,9 @@ def _GetStartPosition(h, w):
     
     
 def GetPrediction(model, img):
-    
-    h, w = img.shape
+    assert len(img.shape) == 3
+    h, w, c = img.shape
+
     positions = _GetStartPosition(h, w)
     count = np.zeros(shape=[h, w])
     batch = []
@@ -28,12 +29,11 @@ def GetPrediction(model, img):
         start_x = positions[idx, 1]
         end_y = start_y + cfg.IMG_HEIGHT
         end_x = start_x + cfg.IMG_WIDTH
-        content = img[start_y:end_y, start_x:end_x]
+        content = img[start_y:end_y, start_x:end_x, :]
         batch.append(content)
         count[start_y:end_y, start_x:end_x] += 1
 
-    batch = np.stack(batch, axis=0)     #(Batch, IMG_HEIGHT, IMG_WIDTH)
-    batch = batch[..., np.newaxis]      #(Batch, IMG_HEIGHT, IMG_WIDTH, 1)
+    batch = np.stack(batch, axis=0)     #(Batch, IMG_HEIGHT, IMG_WIDTH, Channel)
     batch = batch/255 - 0.5
     
     assert np.sum(count==0) ==0
