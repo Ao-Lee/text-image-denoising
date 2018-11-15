@@ -6,10 +6,10 @@
 #### future work:
 maybe also try auto encoder for image denoising???
 
-![Alt text](https://github.com/Ao-Lee/text-image-denoising/raw/master/result/80.png)
-![Alt text](https://github.com/Ao-Lee/text-image-denoising/raw/master/result/81.png)
-![Alt text](https://github.com/Ao-Lee/text-image-denoising/raw/master/result/83.png)
-![Alt text](https://github.com/Ao-Lee/text-image-denoising/raw/master/result/84.png)
+![Alt text](https://github.com/Ao-Lee/text-image-denoising/raw/master/show/result/86.png)
+![Alt text](https://github.com/Ao-Lee/text-image-denoising/raw/master/show/result/87.png)
+![Alt text](https://github.com/Ao-Lee/text-image-denoising/raw/master/show/result/98.png)
+![Alt text](https://github.com/Ao-Lee/text-image-denoising/raw/master/show/result/99.png)
 
 
 
